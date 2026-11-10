@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Reset66 · Guardião</title>
+<!-- Publicado no GitHub Pages (repo reset66-guardiao). Fonte: Reset66/guardian-page/index.html. Sem segredos: só a URL pública da função. -->
+<style>
+  :root {
+    --bg: #0d0d14; --card: #171722; --line: #2a2a3a; --text: #ecebf5; --muted: #9a98b0;
+    --accent: #8b5cf6; --ok: #22c55e; --bad: #ef4444; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 64px; }
+  .brand { font-size: 12px; letter-spacing: .18em; color: var(--accent); font-weight: 700; margin-bottom: 8px; }
+  h1 { font-size: 22px; line-height: 1.25; margin: 0 0 16px; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 24px 0 8px; }
+  p { margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .quote { white-space: pre-wrap; border-left: 3px solid var(--accent); padding-left: 12px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .row { display: flex; justify-content: space-between; gap: 12px; }
+  .score { font-weight: 700; white-space: nowrap; }
+  .big { font-size: 28px; font-weight: 800; }
+  .bad { color: var(--bad); } .ok { color: var(--ok); } .warn { color: var(--warn); }
+  .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; position: sticky; bottom: 0; padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 30%); }
+  button { font: inherit; font-weight: 700; border-radius: 10px; padding: 14px; border: 0; cursor: pointer; width: 100%; }
+  .primary { background: var(--accent); color: #fff; }
+  .secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; }
+  a { color: #b79cff; word-break: break-all; }
+  img { max-width: 100%; border-radius: 8px; display: block; margin-top: 8px; }
+  audio, video { width: 100%; margin-top: 8px; }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #2a2340; color: #c9b8ff; }
+  .center { text-align: center; padding-top: 48px; }
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">Carregando…</p></main>
+<script>
+const API = 'https://yckgyspyhosiwhommzqw.supabase.co/functions/v1/guardian';
+const token = new URLSearchParams(location.search).get('t') || '';
+const app = document.getElementById('app');
+
+function el(tag, attrs, ...children) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') n.className = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const c of children.flat()) if (c != null && c !== false) n.append(c instanceof Node ? c : String(c));
+  return n;
+}
+const fmt = (iso) => iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+const num = (n) => n == null ? '–' : String(Math.round(Number(n) * 10) / 10).replace('.', ',');
+
+async function api(body) {
+  const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!data.ok) throw new Error(data.error || 'Erro ao falar com o servidor.');
+  return data.result;
+}
+
+function render(...nodes) { app.replaceChildren(el('div', { class: 'brand' }, 'RESET66 · GUARDIÃO'), ...nodes); window.scrollTo(0, 0); }
+function message(title, text, cls) { render(el('div', { class: 'center' }, el('h1', { class: cls || '' }, title), text ? el('p', { class: 'muted' }, text) : null)); }
+
+function closedNote(v) {
+  if (v.used) return 'Este link já foi usado — a decisão já foi registrada.';
+  if (v.expired) return 'Este link expirou.';
+  return 'Este pedido não está mais aberto.';
+}
+
+function actions(v, approveLabel, rejectLabel, confirmText) {
+  if (!v.open) return el('div', { class: 'card muted' }, closedNote(v));
+  const go = async (decision, btns) => {
+    const text = decision === 'approve' ? confirmText.approve : confirmText.reject;
+    if (!confirm(text)) return;
+    btns.forEach(b => b.disabled = true);
+    try {
+      const r = await api({ route: 'decide', token, decision });
+      message('Feito ✓', r.message, 'ok');
+    } catch (e) {
+      alert(e.message);
+      btns.forEach(b => b.disabled = false);
+    }
+  };
+  const a = el('button', { class: 'primary' }, approveLabel);
+  const r = el('button', { class: 'secondary' }, rejectLabel);
+  a.addEventListener('click', () => go('approve', [a, r]));
+  r.addEventListener('click', () => go('reject', [a, r]));
+  return el('div', { class: 'actions' }, a, r);
+}
+
+function rubricCard(rubric, evaluation) {
+  const byId = Object.fromEntries((evaluation?.criteria || []).map(c => [c.id, c]));
+  return (rubric || []).map(c => {
+    const ev = byId[c.id];
+    return el('div', { class: 'card' },
+      el('div', { class: 'row' }, el('strong', {}, c.name), el('span', { class: 'score' }, ev ? `${num(ev.score)} / ${num(c.weight)}` : `peso ${num(c.weight)}`)),
+      c.description ? el('p', { class: 'muted' }, c.description) : null,
+      ev?.justification ? el('p', {}, el('em', {}, 'IA: '), ev.justification) : null,
+    );
+  });
+}
+
+function partNode(p) {
+  if (p.kind === 'text') return el('div', { class: 'card quote' }, p.text);
+  if (p.kind === 'link') return el('div', { class: 'card' }, '🔗 ', el('a', { href: p.url, target: '_blank', rel: 'noopener noreferrer' }, p.url));
+  if (!p.url) return el('div', { class: 'card muted' }, `Arquivo indisponível: ${p.name || ''}`);
+  const label = el('div', {}, el('a', { href: p.url, target: '_blank', rel: 'noopener noreferrer' }, `📎 ${p.name || 'arquivo'}`), el('span', { class: 'muted' }, ' (link vale 1 h)'));
+  const mime = p.mime || '';
+  const media = mime.startsWith('image/') ? el('img', { src: p.url, alt: p.name || '' })
+    : mime.startsWith('audio/') ? el('audio', { src: p.url, controls: '' })
+    : mime.startsWith('video/') ? el('video', { src: p.url, controls: '', playsinline: '' }) : null;
+  return el('div', { class: 'card' }, label, media);
+}
+
+const VERDICT = { authentic: 'parece autêntica', doubtful: 'autenticidade duvidosa', likely_not_authentic: 'provavelmente não foi feita pela pessoa' };
+
+function show(v) {
+  if (v.purpose === 'accept') {
+    return render(
+      el('h1', {}, `${v.owner} quer que você seja o guardião dele(a)`),
+      el('p', {}, `No app Reset66, cada tarefa de ${v.owner} tem prazo e a entrega é avaliada por IA (nota mínima 7). Se não passar até o prazo, Instagram e YouTube ficam bloqueados no celular até sair uma entrega aprovada.`),
+      el('h2', {}, 'O que o guardião faz'),
+      el('div', { class: 'card' },
+        el('p', {}, '• Aprova ou recusa pedidos de mudança de prazo.'),
+        el('p', {}, '• Decide contestações de nota (vê a entrega, a rubrica e a avaliação da IA).'),
+        el('p', {}, '• Recebe avisos se o bloqueio parecer desligado ou se o anti-trapaça for desligado.'),
+        el('p', { class: 'muted' }, 'Tudo por e-mail + esta página. Não precisa instalar nada. Seja justo, mas firme 🙂'),
+      ),
+      actions(v, 'Aceito ser guardião', 'Recusar', {
+        approve: `Confirmar: você será o guardião de ${v.owner}?`, reject: 'Recusar o convite?',
+      }),
+    );
+  }
+  if (v.purpose === 'approve_change') {
+    return render(
+      el('h1', {}, `${v.owner} quer trocar de guardião`),
+      el('div', { class: 'card' }, el('p', {}, 'Novo guardião proposto:'), el('p', {}, el('strong', {}, v.next?.name || '—'), ` · ${v.next?.email || ''}`)),
+      el('p', { class: 'muted' }, 'Se você aprovar, deixa de ser guardião e o novo recebe um convite. Se achar que é um contato falso para fugir das regras, recuse.'),
+      actions(v, 'Aprovar a troca', 'Recusar (continuo guardião)', {
+        approve: 'Aprovar a troca de guardião?', reject: 'Recusar a troca?',
+      }),
+    );
+  }
+  if (v.kind === 'deadline_change') {
+    return render(
+      el('h1', {}, `${v.owner} pediu para mudar um prazo`),
+      el('div', { class: 'card' },
+        el('div', { class: 'row' }, el('span', { class: 'muted' }, 'Prazo atual'), el('strong', {}, fmt(v.old_deadline))),
+        el('div', { class: 'row' }, el('span', { class: 'muted' }, 'Novo prazo pedido'), el('strong', { class: 'warn' }, fmt(v.new_deadline))),
+        el('p', { class: 'muted' }, `Pedido feito em ${fmt(v.created_at)}`),
+      ),
+      el('h2', {}, 'Justificativa'), el('div', { class: 'card quote' }, v.justification),
+      el('h2', {}, 'Tarefa'), el('div', { class: 'card quote' }, v.task?.description || ''),
+      actions(v, 'Aprovar novo prazo', 'Recusar', {
+        approve: `Aprovar o novo prazo (${fmt(v.new_deadline)})?`, reject: 'Recusar o pedido? O prazo continua o mesmo.',
+      }),
+    );
+  }
+  // contestação
+  const d = v.delivery || {};
+  const ev = d.evaluation || {};
+  return render(
+    el('h1', {}, `${v.owner} contestou uma nota`),
+    el('div', { class: 'card' },
+      el('div', { class: 'row' }, el('span', {}, 'Nota da IA'), el('span', { class: 'big bad' }, `${num(d.score)} / 10`)),
+      el('p', { class: 'muted' }, `Mínimo para passar: 7 · entregue em ${fmt(d.submitted_at)}${d.late ? ' (depois do prazo)' : ''}`),
+    ),
+    el('h2', {}, `Justificativa de ${v.owner}`), el('div', { class: 'card quote' }, v.justification),
+    el('h2', {}, 'Tarefa'), el('div', { class: 'card quote' }, v.task?.description || ''),
+    v.task?.anti_cheat ? el('p', {}, el('span', { class: 'pill' }, 'anti-trapaça ligado'), ' a entrega precisava trazer evidências do processo.') : null,
+    el('h2', {}, 'Entrega'), ...(d.parts || []).map(partNode),
+    el('h2', {}, 'Avaliação da IA por critério'), ...rubricCard(v.task?.rubric, ev),
+    ev.summary ? el('div', { class: 'card' }, el('strong', {}, 'Resumo da IA: '), ev.summary) : null,
+    ev.authenticity && ev.authenticity.verdict !== 'not_applicable' ? el('div', { class: 'card' }, el('strong', {}, 'Autenticidade: '), VERDICT[ev.authenticity.verdict] || ev.authenticity.verdict,
+      ev.authenticity.notes ? el('p', { class: 'muted' }, ev.authenticity.notes) : null,
+      ev.capped ? el('p', { class: 'warn' }, 'Por isso a nota foi limitada a 6.') : null) : null,
+    actions(v, 'Aprovar (conta como nota ≥ 7)', 'Manter a nota', {
+      approve: 'Aprovar a contestação? A entrega passa a contar como aprovada e o bloqueio desta tarefa cai.',
+      reject: 'Manter a nota da IA?',
+    }),
+  );
+}
+
+(async () => {
+  if (!token) return message('Link incompleto', 'Abra o link exatamente como veio no e-mail.');
+  try {
+    show(await api({ route: 'view', token }));
+  } catch (e) {
+    message('Não deu para abrir', e.message, 'bad');
+  }
+})();
+</script>
+</body>
+</html>
